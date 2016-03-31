@@ -109,6 +109,13 @@ class CustomResource(object):
             "PhysicalResourceId": 
                 self.physicalresourceid if self.physicalresourceid else str(uuid.uuid4())
         }
+        try:
+            if not success:
+                reason = str(self.failure_exception)
+                source_attributes["Reason"] = reason
+        except:
+            log.warning(u"Could not convert failure exception to string in CloudFormation response payload. Dropping...")
+
         return source_attributes
 
     def invoke_chained_lambda(self):
@@ -144,13 +151,18 @@ class CustomResource(object):
                           self.requesttype, self.result_text)
                 success = False
 
-        except:
+        except Exception as exception:
+            # Send the exception back to CloudFormation
+            self.failure_exception = exception
+
+            # log details to the CloudWatch?
             e = sys.exc_info()
             log.error(u"Command %s-%s failed", self.logicalresourceid, self.requesttype)
             log.debug(u"Command %s error: %s", self.logicalresourceid, str(e[1]))
             log.debug(u"Command %s traceback:", self.logicalresourceid)
             traceback.print_tb(e[2])
             success = False
+
 
         log.debug(u"Command %s-%s processing %s", self.logicalresourceid, self.requesttype, self.processing)
         log.debug(u"Command %s-%s success %s", self.logicalresourceid, self.requesttype, success)
